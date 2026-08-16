@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Admin Login - Recipe Manager</title>
+
+    <link rel="stylesheet" href="css/login.css" />
+  </head>
+
+  <body>
+    <div class="login-page">
+      <div class="login-card">
+        <div class="brand">
+          <div class="logo-icon">🍴</div>
+
+          <h1>Recipe Manager</h1>
+
+          <p>Admin Login</p>
+        </div>
+
+        <form id="loginForm">
+          <!-- Email -->
+
+          <div class="form-group">
+            <label for="email"> Email Address </label>
+
+            <input
+              type="email"
+              id="email"
+              placeholder="Enter your email"
+              required
+              autocomplete="email"
+            />
+          </div>
+
+          <!-- Password -->
+
+          <div class="form-group">
+            <label for="password"> Password </label>
+
+            <div class="password-box">
+              <input
+                type="password"
+                id="password"
+                placeholder="Enter your password"
+                required
+                autocomplete="current-password"
+              />
+
+              <button type="button" id="togglePassword">Show</button>
+            </div>
+          </div>
+
+          <!-- Options -->
+
+          <div class="login-options">
+            <label class="remember">
+              <input type="checkbox" id="remember" />
+
+              Remember me
+            </label>
+
+            <a href="#" id="forgotPassword"> Forgot Password? </a>
+          </div>
+
+          <!-- Login -->
+
+          <button type="submit" class="login-btn" id="loginButton">
+            Login
+          </button>
+
+          <!-- Message -->
+
+          <div id="loginMessage" aria-live="polite"></div>
+        </form>
+
+        <div class="signup-link">
+          <p>
+            Don't have an admin account?
+
+            <a href="signup.html"> Create Account </a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/login.js"></script>
+  </body>
+</html>

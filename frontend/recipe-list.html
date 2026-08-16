@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Recipe List</title>
+
+    <link
+        rel="stylesheet"
+        href="css/recipe-list.css"
+    >
+
+</head>
+
+
+<body>
+
+
+<header>
+
+    <div class="logo">
+        Recipe Manager
+    </div>
+
+
+    <nav>
+
+        <a
+            href="dashboard.html"
+        >
+            Dashboard
+        </a>
+
+        <a
+            href="recipe-list.html"
+            class="active"
+        >
+            Recipes
+        </a>
+
+        <a
+            href="ingredient-list.html"
+        >
+            Ingredients
+        </a>
+
+        <a
+            href="recipe-add-edit.html"
+        >
+            Add Recipe
+        </a>
+
+    </nav>
+
+</header>
+
+
+<main class="container">
+
+
+    <!-- Top Section -->
+
+    <div class="top-section">
+
+        <div>
+
+            <h1>
+                Recipe List
+            </h1>
+
+            <p>
+                Browse and manage your recipes.
+            </p>
+
+        </div>
+
+
+        <a
+            href="recipe-add-edit.html"
+            class="add-btn"
+        >
+            + Add Recipe
+        </a>
+
+    </div>
+
+
+    <!-- Search -->
+
+    <div class="search-area">
+
+        <input
+            type="text"
+            id="searchInput"
+            placeholder="Search recipe by name..."
+            autocomplete="off"
+        >
+
+
+        <select
+            id="difficultyFilter"
+        >
+
+            <option value="">
+                All Difficulty
+            </option>
+
+            <option value="Easy">
+                Easy
+            </option>
+
+            <option value="Medium">
+                Medium
+            </option>
+
+            <option value="Hard">
+                Hard
+            </option>
+
+        </select>
+
+    </div>
+
+
+    <!-- Recipe Grid -->
+
+    <div
+        class="recipe-grid"
+        id="recipeGrid"
+    >
+
+        <!-- Recipes are loaded by JavaScript -->
+
+    </div>
+
+
+</main>
+
+
+<script src="js/recipe-list.js"></script>
+
+</body>
+
+</html>

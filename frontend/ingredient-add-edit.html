@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Add Ingredient - Recipe Manager</title>
+
+    <link
+        rel="stylesheet"
+        href="css/ingredient-add-edit.css"
+    >
+
+</head>
+
+
+<body>
+
+
+<header>
+
+    <div class="logo">
+        Recipe Manager
+    </div>
+
+
+    <nav>
+
+        <a href="dashboard.html">
+            Dashboard
+        </a>
+
+        <a href="recipe-list.html">
+            Recipes
+        </a>
+
+        <a
+            href="ingredient-list.html"
+            class="active"
+        >
+            Ingredients
+        </a>
+
+        <a href="recipe-add-edit.html">
+            Add Recipe
+        </a>
+
+    </nav>
+
+</header>
+
+
+<main class="container">
+
+
+    <div class="form-card">
+
+        <h1 id="pageTitle">
+            Add Ingredient
+        </h1>
+
+
+        <p id="pageDescription">
+            Add a new ingredient to your ingredient list.
+        </p>
+
+
+        <form id="ingredientForm">
+
+
+            <!-- Ingredient Name -->
+
+            <label for="ingredientName">
+                Ingredient Name
+            </label>
+
+
+            <input
+                type="text"
+                id="ingredientName"
+                placeholder="Enter ingredient name"
+                required
+                autocomplete="off"
+            >
+
+
+            <!-- Unit -->
+
+            <label for="unit">
+                Unit of Measurement
+            </label>
+
+
+            <select
+                id="unit"
+                required
+            >
+
+                <option value="">
+                    Select unit
+                </option>
+
+                <option value="g">
+                    g
+                </option>
+
+                <option value="kg">
+                    kg
+                </option>
+
+                <option value="ml">
+                    ml
+                </option>
+
+                <option value="l">
+                    l
+                </option>
+
+                <option value="pcs">
+                    pcs
+                </option>
+
+                <option value="tbsp">
+                    tbsp
+                </option>
+
+                <option value="tsp">
+                    tsp
+                </option>
+
+            </select>
+
+
+            <!-- Message -->
+
+            <div
+                id="formMessage"
+                aria-live="polite"
+            ></div>
+
+
+            <!-- Buttons -->
+
+            <div class="buttons">
+
+                <button
+                    type="submit"
+                    class="save-btn"
+                    id="saveButton"
+                >
+                    Save Ingredient
+                </button>
+
+
+                <a
+                    href="ingredient-list.html"
+                    class="cancel-btn"
+                >
+                    Cancel
+                </a>
+
+            </div>
+
+
+        </form>
+
+    </div>
+
+
+</main>
+
+
+<script src="js/ingredient-add-edit.js"></script>
+
+</body>
+
+</html>

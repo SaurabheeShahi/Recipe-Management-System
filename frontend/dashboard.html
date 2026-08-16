@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Recipe Manager - Dashboard</title>
+
+    <link rel="stylesheet" href="css/dashboard.css" />
+  </head>
+
+  <body>
+    <header class="header">
+      <div class="logo">Recipe Manager</div>
+
+      <nav>
+        <a href="dashboard.html" class="active">Dashboard</a>
+        <a href="recipe-list.html">Recipes</a>
+        <a href="ingredient-list.html">Ingredients</a>
+      </nav>
+    </header>
+
+    <main class="container">
+      <!-- Welcome Section -->
+
+      <section class="welcome">
+        <div>
+          <p class="small-title">WELCOME BACK</p>
+
+          <h1>Recipe Dashboard</h1>
+
+          <p class="welcome-text">
+            Manage your recipes and ingredients easily from one place.
+          </p>
+        </div>
+
+        <a href="recipe-add-edit.html" class="primary-btn"> + Add Recipe </a>
+      </section>
+
+      <!-- Statistics -->
+
+      <section class="stats">
+        <div class="stat-card">
+          <div class="stat-icon">🍴</div>
+
+          <div>
+            <h2 id="totalRecipes">0</h2>
+            <p>Total Recipes</p>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">🥕</div>
+
+          <div>
+            <h2 id="totalIngredients">0</h2>
+            <p>Total Ingredients</p>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">⭐</div>
+
+          <div>
+            <h2 id="easyRecipes">0</h2>
+            <p>Easy Recipes</p>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">🔥</div>
+
+          <div>
+            <h2 id="hardRecipes">0</h2>
+            <p>Hard Recipes</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quick Actions -->
+
+      <section class="section">
+        <div class="section-heading">
+          <div>
+            <h2>Quick Actions</h2>
+
+            <p>Quickly access the most important features.</p>
+          </div>
+        </div>
+
+        <div class="quick-actions">
+          <a href="recipe-add-edit.html" class="action-card">
+            <div class="action-icon">＋</div>
+
+            <div>
+              <h3>Add Recipe</h3>
+
+              <p>Create a new recipe with ingredients and image.</p>
+            </div>
+          </a>
+
+          <a href="recipe-list.html" class="action-card">
+            <div class="action-icon">📖</div>
+
+            <div>
+              <h3>View Recipes</h3>
+
+              <p>Browse and manage all your recipes.</p>
+            </div>
+          </a>
+
+          <a href="ingredient-add-edit.html" class="action-card">
+            <div class="action-icon">🥕</div>
+
+            <div>
+              <h3>Add Ingredient</h3>
+
+              <p>Add a new ingredient and measurement unit.</p>
+            </div>
+          </a>
+
+          <a href="ingredient-list.html" class="action-card">
+            <div class="action-icon">📋</div>
+
+            <div>
+              <h3>View Ingredients</h3>
+
+              <p>View and manage all ingredients.</p>
+            </div>
+          </a>
+        </div>
+      </section>
+
+      <!-- Recent Recipes -->
+
+      <section class="section">
+        <div class="section-heading">
+          <div>
+            <h2>Recent Recipes</h2>
+
+            <p>Recently added recipes.</p>
+          </div>
+
+          <a href="recipe-list.html" class="view-all"> View All → </a>
+        </div>
+
+        <div class="recent-recipes" id="recentRecipes">
+          <!-- Recipes will be loaded from the database -->
+        </div>
+      </section>
+
+      <!-- System Information -->
+
+      <section class="info-section">
+        <div>
+          <h2>Recipe Management System</h2>
+
+          <p>
+            Keep your recipes organized, manage ingredients, and easily create
+            and edit your cooking collection.
+          </p>
+        </div>
+
+        <a href="recipe-list.html" class="secondary-btn"> Explore Recipes </a>
+      </section>
+    </main>
+
+    <footer>
+      <p>© 2026 Recipe Manager. All rights reserved.</p>
+    </footer>
+
+    <script src="js/dashboard.js"></script>
+  </body>
+</html>

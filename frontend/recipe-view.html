@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>View Recipe</title>
+
+    <link
+        rel="stylesheet"
+        href="css/recipe-view.css"
+    >
+
+</head>
+
+
+<body>
+
+
+<header>
+
+    <div class="logo">
+        Recipe Manager
+    </div>
+
+
+    <nav>
+
+        <a
+            href="dashboard.html"
+        >
+            Dashboard
+        </a>
+
+        <a
+            href="recipe-list.html"
+        >
+            Recipes
+        </a>
+
+        <a
+            href="ingredient-list.html"
+        >
+            Ingredients
+        </a>
+
+        <a
+            href="recipe-add-edit.html"
+        >
+            Add Recipe
+        </a>
+
+    </nav>
+
+</header>
+
+
+<main class="container">
+
+
+    <a
+        href="recipe-list.html"
+        class="back"
+    >
+        ← Back to Recipes
+    </a>
+
+
+    <!-- Recipe Header -->
+
+    <div class="recipe-header">
+
+        <img
+            id="recipeImage"
+            src="images/chicken-curry.jpg"
+            alt="Recipe"
+        >
+
+
+        <div class="recipe-info">
+
+            <span id="recipeCategory">
+                Recipe
+            </span>
+
+
+            <h1 id="recipeName">
+                Loading...
+            </h1>
+
+
+            <p
+                class="difficulty"
+                id="recipeDifficulty"
+            >
+                Difficulty:
+            </p>
+
+
+            <p id="recipeDescription">
+                Loading recipe description...
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <!-- Ingredients -->
+
+    <section>
+
+        <h2>
+            Ingredients
+        </h2>
+
+
+        <ul id="ingredientList">
+
+            <li>
+                Loading ingredients...
+            </li>
+
+        </ul>
+
+    </section>
+
+
+    <!-- Instructions -->
+
+    <section>
+
+        <h2>
+            Instructions
+        </h2>
+
+
+        <ol id="instructionList">
+
+            <li>
+                Loading instructions...
+            </li>
+
+        </ol>
+
+    </section>
+
+
+    <!-- Buttons -->
+
+    <div class="buttons">
+
+        <a
+            href="#"
+            id="editBtn"
+            class="edit-btn"
+        >
+            Edit Recipe
+        </a>
+
+
+        <button
+            id="deleteBtn"
+            class="delete-btn"
+        >
+            Delete Recipe
+        </button>
+
+    </div>
+
+
+</main>
+
+
+<script src="js/recipe-view.js"></script>
+
+</body>
+
+</html>

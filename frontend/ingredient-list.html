@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Ingredient List</title>
+
+    <link
+        rel="stylesheet"
+        href="css/ingredient-list.css"
+    >
+
+</head>
+
+
+<body>
+
+
+<header>
+
+    <div class="logo">
+        Recipe Manager
+    </div>
+
+
+    <nav>
+
+        <a href="dashboard.html">
+            Dashboard
+        </a>
+
+        <a href="recipe-list.html">
+            Recipes
+        </a>
+
+        <a
+            href="ingredient-list.html"
+            class="active"
+        >
+            Ingredients
+        </a>
+
+        <a href="recipe-add-edit.html">
+            Add Recipe
+        </a>
+
+    </nav>
+
+</header>
+
+
+<main class="container">
+
+
+    <!-- Top Section -->
+
+    <div class="top-section">
+
+        <div>
+
+            <h1>
+                Ingredient List
+            </h1>
+
+            <p>
+                Manage all available ingredients.
+            </p>
+
+        </div>
+
+
+        <a
+            href="ingredient-add-edit.html"
+            class="add-btn"
+        >
+            + Add Ingredient
+        </a>
+
+    </div>
+
+
+    <!-- Search -->
+
+    <div class="search-box">
+
+        <input
+            type="text"
+            id="ingredientSearch"
+            placeholder="Search ingredient..."
+            autocomplete="off"
+        >
+
+    </div>
+
+
+    <!-- Table -->
+
+    <div class="table-container">
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                    <th>#</th>
+
+                    <th>
+                        Ingredient Name
+                    </th>
+
+                    <th>
+                        Unit of Measurement
+                    </th>
+
+                    <th>
+                        Actions
+                    </th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody id="ingredientTable">
+
+                <!-- Ingredients loaded from database -->
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+
+</main>
+
+
+<script src="js/ingredient-list.js"></script>
+
+</body>
+
+</html>
