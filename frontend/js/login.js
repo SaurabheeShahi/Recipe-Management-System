@@ -3,6 +3,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
 
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
+  const remember = document.getElementById("remember").checked;
   const message = document.getElementById("loginMessage");
   const button = document.getElementById("loginButton");
 
@@ -29,8 +30,19 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
       return;
     }
 
-    localStorage.setItem("token", data.token);
-    localStorage.setItem("user", JSON.stringify(data.user));
+    // Remove any old login state first.
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("user");
+
+    if (remember) {
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+    } else {
+      sessionStorage.setItem("token", data.token);
+      sessionStorage.setItem("user", JSON.stringify(data.user));
+    }
 
     window.location.href = "dashboard.html";
   } catch (error) {

@@ -1,5 +1,51 @@
+// =====================================================
+// AUTHENTICATION HELPER
+// Keeps authentication consistent across all protected pages.
+// =====================================================
+
+function getAuthToken() {
+    return localStorage.getItem("token") ||
+           sessionStorage.getItem("token");
+}
+
+function clearAuth() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("user");
+}
+
+async function authFetch(url, options = {}) {
+    const token = getAuthToken();
+
+    if (!token) {
+        window.location.href = "login.html";
+        throw new Error("Not authenticated.");
+    }
+
+    const headers = new Headers(options.headers || {});
+    headers.set("Authorization", `Bearer ${token}`);
+
+    const response = await fetch(url, {
+        ...options,
+        headers
+    });
+
+    if (response.status === 401) {
+        clearAuth();
+        window.location.href = "login.html";
+        throw new Error("Your session has expired. Please login again.");
+    }
+
+    return response;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
-    const token = localStorage.getItem("token");
+    if (!getAuthToken()) {
+        window.location.href = "login.html";
+        return;
+    }
+    const token = getAuthToken();
 
     // Check whether user is logged in
     if (!token) {
@@ -8,16 +54,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     try {
-        const response = await fetch("/api/dashboard", {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
+        const response = await authFetch("/api/dashboard");
 
         // If token is invalid, go back to login
         if (response.status === 401) {
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
+            clearAuth();
 
             window.location.href = "login.html";
             return;
@@ -73,13 +114,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             const image =
                 recipe.image ||
-                "images/default-recipe.jpg";
+                "images/chicken-curry.jpg";
 
             card.innerHTML = `
                 <img
                     src="${image}"
                     alt="${recipe.name}"
-                    onerror="this.src='images/default-recipe.jpg'"
+                    onerror="this.src='images/chicken-curry.jpg'"
                 >
 
                 <div class="recent-info">

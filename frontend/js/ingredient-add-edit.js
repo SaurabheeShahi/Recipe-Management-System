@@ -1,23 +1,52 @@
 // =====================================================
-// ADD / EDIT INGREDIENT
+// AUTHENTICATION HELPER
+// Keeps authentication consistent across all protected pages.
 // =====================================================
 
-
-// -----------------------------------------------------
-// CHECK LOGIN
-// -----------------------------------------------------
-
-const token =
-    localStorage.getItem("recipeManagerToken") ||
-    sessionStorage.getItem("recipeManagerToken");
-
-
-if (!token) {
-
-    window.location.href =
-        "login.html";
-
+function getAuthToken() {
+    return localStorage.getItem("token") ||
+           sessionStorage.getItem("token");
 }
+
+function clearAuth() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("user");
+}
+
+async function authFetch(url, options = {}) {
+    const token = getAuthToken();
+
+    if (!token) {
+        window.location.href = "login.html";
+        throw new Error("Not authenticated.");
+    }
+
+    const headers = new Headers(options.headers || {});
+    headers.set("Authorization", `Bearer ${token}`);
+
+    const response = await fetch(url, {
+        ...options,
+        headers
+    });
+
+    if (response.status === 401) {
+        clearAuth();
+        window.location.href = "login.html";
+        throw new Error("Your session has expired. Please login again.");
+    }
+
+    return response;
+}
+
+if (!getAuthToken()) {
+    window.location.href = "login.html";
+}
+
+// =====================================================
+// ADD / EDIT INGREDIENT
+// =====================================================
 
 
 // -----------------------------------------------------
@@ -138,7 +167,7 @@ async function loadIngredient() {
     try {
 
         const response =
-            await fetch(
+            await authFetch(
                 `${API_URL}/${ingredientId}`
             );
 
@@ -259,7 +288,7 @@ form.addEventListener(
 
 
             const response =
-                await fetch(
+                await authFetch(
                     url,
                     {
                         method: method,

@@ -34,25 +34,54 @@ app.use(
 );
 
 // =====================================================
-// DATABASE CHECK
+// DATABASE READY MIDDLEWARE
 // =====================================================
 
-app.get("/api", async (req, res) => {
+// Make sure the Turso tables are ready before ANY API
+// route tries to access the database.
+
+app.use("/api", async (req, res, next) => {
   try {
     await databaseReady;
-
-    res.json({
-      message: "Recipe Management System API is running.",
-      database: "connected",
-    });
+    next();
   } catch (error) {
-    console.error("Database error:", error);
+    console.error("Database initialization error:", error);
 
-    res.status(500).json({
-      error: "Database connection failed.",
+    return res.status(500).json({
+      error: "Database is not available.",
     });
   }
 });
+
+// =====================================================
+// HELPER FUNCTIONS
+// =====================================================
+
+function getId(value) {
+  const id = Number(value);
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return null;
+  }
+
+  return id;
+}
+
+function getTokenFromRequest(req) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return null;
+  }
+
+  const parts = authHeader.trim().split(/\s+/);
+
+  if (parts.length !== 2 || parts[0] !== "Bearer") {
+    return null;
+  }
+
+  return parts[1];
+}
 
 // =====================================================
 // AUTHENTICATION MIDDLEWARE
@@ -60,28 +89,20 @@ app.get("/api", async (req, res) => {
 
 function authenticateToken(req, res, next) {
   if (!JWT_SECRET) {
+    console.error("JWT_SECRET is missing.");
+
     return res.status(500).json({
-      error: "JWT_SECRET is missing from .env",
+      error: "Server authentication configuration is missing.",
     });
   }
 
-  const authHeader = req.headers.authorization;
+  const token = getTokenFromRequest(req);
 
-  if (!authHeader) {
+  if (!token) {
     return res.status(401).json({
       error: "Authentication required.",
     });
   }
-
-  const parts = authHeader.split(" ");
-
-  if (parts.length !== 2 || parts[0] !== "Bearer") {
-    return res.status(401).json({
-      error: "Invalid authentication format.",
-    });
-  }
-
-  const token = parts[1];
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -90,11 +111,32 @@ function authenticateToken(req, res, next) {
 
     next();
   } catch (error) {
+    console.error("JWT verification error:", error.message);
+
     return res.status(401).json({
       error: "Invalid or expired token.",
     });
   }
 }
+
+// =====================================================
+// API HEALTH CHECK
+// =====================================================
+
+app.get("/api", async (req, res) => {
+  try {
+    res.json({
+      message: "Recipe Management System API is running.",
+      database: "connected",
+    });
+  } catch (error) {
+    console.error("API health check error:", error);
+
+    res.status(500).json({
+      error: "Database connection failed.",
+    });
+  }
+});
 
 // =====================================================
 // AUTH - SIGNUP
@@ -104,23 +146,21 @@ app.post("/api/auth/signup", async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    // -------------------------------------------------
-    // Validation
-    // -------------------------------------------------
-
     if (!name || !email || !password) {
       return res.status(400).json({
         error: "Please fill in all required fields.",
       });
     }
 
-    if (name.trim().length < 2) {
+    const cleanName = String(name).trim();
+    const userEmail = String(email).trim().toLowerCase();
+    const userPassword = String(password);
+
+    if (cleanName.length < 2) {
       return res.status(400).json({
         error: "Name must be at least 2 characters.",
       });
     }
-
-    const userEmail = email.trim().toLowerCase();
 
     if (!userEmail.includes("@")) {
       return res.status(400).json({
@@ -128,15 +168,11 @@ app.post("/api/auth/signup", async (req, res) => {
       });
     }
 
-    if (password.length < 6) {
+    if (userPassword.length < 6) {
       return res.status(400).json({
         error: "Password must be at least 6 characters.",
       });
     }
-
-    // -------------------------------------------------
-    // Check existing email
-    // -------------------------------------------------
 
     const existingUser = await get(
       `
@@ -153,15 +189,7 @@ app.post("/api/auth/signup", async (req, res) => {
       });
     }
 
-    // -------------------------------------------------
-    // Hash password
-    // -------------------------------------------------
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // -------------------------------------------------
-    // Create user
-    // -------------------------------------------------
+    const passwordHash = await bcrypt.hash(userPassword, 10);
 
     const result = await run(
       `
@@ -174,18 +202,14 @@ app.post("/api/auth/signup", async (req, res) => {
       )
       VALUES (?, ?, ?, ?)
       `,
-      [name.trim(), userEmail, passwordHash, "admin"],
+      [cleanName, userEmail, passwordHash, "admin"],
     );
 
-    // -------------------------------------------------
-    // Response
-    // -------------------------------------------------
-
-    res.status(201).json({
+    return res.status(201).json({
       message: "Account created successfully.",
       user: {
         id: Number(result.lastInsertRowid),
-        name: name.trim(),
+        name: cleanName,
         email: userEmail,
         role: "admin",
       },
@@ -199,7 +223,7 @@ app.post("/api/auth/signup", async (req, res) => {
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Server error while creating account.",
     });
   }
@@ -213,21 +237,14 @@ app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // -------------------------------------------------
-    // Validation
-    // -------------------------------------------------
-
     if (!email || !password) {
       return res.status(400).json({
         error: "Please enter your email and password.",
       });
     }
 
-    const userEmail = email.trim().toLowerCase();
-
-    // -------------------------------------------------
-    // Find user
-    // -------------------------------------------------
+    const userEmail = String(email).trim().toLowerCase();
+    const userPassword = String(password);
 
     const user = await get(
       `
@@ -249,11 +266,10 @@ app.post("/api/auth/login", async (req, res) => {
       });
     }
 
-    // -------------------------------------------------
-    // Check password
-    // -------------------------------------------------
-
-    const passwordCorrect = await bcrypt.compare(password, user.password_hash);
+    const passwordCorrect = await bcrypt.compare(
+      userPassword,
+      user.password_hash,
+    );
 
     if (!passwordCorrect) {
       return res.status(401).json({
@@ -261,21 +277,13 @@ app.post("/api/auth/login", async (req, res) => {
       });
     }
 
-    // -------------------------------------------------
-    // Check JWT secret
-    // -------------------------------------------------
-
     if (!JWT_SECRET) {
-      console.error("JWT_SECRET is missing from .env");
+      console.error("JWT_SECRET is missing.");
 
       return res.status(500).json({
         error: "Server authentication configuration is missing.",
       });
     }
-
-    // -------------------------------------------------
-    // Create JWT
-    // -------------------------------------------------
 
     const token = jwt.sign(
       {
@@ -289,14 +297,9 @@ app.post("/api/auth/login", async (req, res) => {
       },
     );
 
-    // -------------------------------------------------
-    // Response
-    // -------------------------------------------------
-
-    res.json({
+    return res.json({
       message: "Login successful.",
-      token: token,
-
+      token,
       user: {
         id: Number(user.id),
         name: user.name,
@@ -307,14 +310,14 @@ app.post("/api/auth/login", async (req, res) => {
   } catch (error) {
     console.error("Login error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Server error while logging in.",
     });
   }
 });
 
 // =====================================================
-// GET CURRENT USER
+// AUTH - CURRENT USER
 // =====================================================
 
 app.get("/api/auth/me", authenticateToken, async (req, res) => {
@@ -338,11 +341,16 @@ app.get("/api/auth/me", authenticateToken, async (req, res) => {
       });
     }
 
-    res.json(user);
+    return res.json({
+      id: Number(user.id),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    });
   } catch (error) {
     console.error("Get current user error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to load user.",
     });
   }
@@ -352,24 +360,24 @@ app.get("/api/auth/me", authenticateToken, async (req, res) => {
 // INGREDIENTS - GET ALL
 // =====================================================
 
-app.get("/api/ingredients", async (req, res) => {
+app.get("/api/ingredients", authenticateToken, async (req, res) => {
   try {
     const ingredients = await all(
       `
-      SELECT
-        id,
-        name,
-        unit
-      FROM ingredients
-      ORDER BY name ASC
-      `,
+        SELECT
+          id,
+          name,
+          unit
+        FROM ingredients
+        ORDER BY name ASC
+        `,
     );
 
-    res.json(ingredients);
+    return res.json(ingredients);
   } catch (error) {
     console.error("Load ingredients error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to load ingredients.",
     });
   }
@@ -379,8 +387,16 @@ app.get("/api/ingredients", async (req, res) => {
 // INGREDIENT - GET ONE
 // =====================================================
 
-app.get("/api/ingredients/:id", async (req, res) => {
+app.get("/api/ingredients/:id", authenticateToken, async (req, res) => {
   try {
+    const id = getId(req.params.id);
+
+    if (!id) {
+      return res.status(400).json({
+        error: "Invalid ingredient ID.",
+      });
+    }
+
     const ingredient = await get(
       `
         SELECT
@@ -390,7 +406,7 @@ app.get("/api/ingredients/:id", async (req, res) => {
         FROM ingredients
         WHERE id = ?
         `,
-      [req.params.id],
+      [id],
     );
 
     if (!ingredient) {
@@ -399,11 +415,15 @@ app.get("/api/ingredients/:id", async (req, res) => {
       });
     }
 
-    res.json(ingredient);
+    return res.json({
+      id: Number(ingredient.id),
+      name: ingredient.name,
+      unit: ingredient.unit,
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Load ingredient error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to load ingredient.",
     });
   }
@@ -423,8 +443,14 @@ app.post("/api/ingredients", authenticateToken, async (req, res) => {
       });
     }
 
-    const ingredientName = name.trim();
-    const ingredientUnit = unit.trim();
+    const ingredientName = String(name).trim();
+    const ingredientUnit = String(unit).trim();
+
+    if (!ingredientName || !ingredientUnit) {
+      return res.status(400).json({
+        error: "Ingredient name and unit are required.",
+      });
+    }
 
     const existing = await get(
       `
@@ -453,7 +479,7 @@ app.post("/api/ingredients", authenticateToken, async (req, res) => {
       [ingredientName, ingredientUnit],
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       id: Number(result.lastInsertRowid),
       name: ingredientName,
       unit: ingredientUnit,
@@ -461,7 +487,13 @@ app.post("/api/ingredients", authenticateToken, async (req, res) => {
   } catch (error) {
     console.error("Create ingredient error:", error);
 
-    res.status(500).json({
+    if (error.message && error.message.toLowerCase().includes("unique")) {
+      return res.status(409).json({
+        error: "Ingredient already exists.",
+      });
+    }
+
+    return res.status(500).json({
       error: "Failed to create ingredient.",
     });
   }
@@ -473,6 +505,14 @@ app.post("/api/ingredients", authenticateToken, async (req, res) => {
 
 app.put("/api/ingredients/:id", authenticateToken, async (req, res) => {
   try {
+    const id = getId(req.params.id);
+
+    if (!id) {
+      return res.status(400).json({
+        error: "Invalid ingredient ID.",
+      });
+    }
+
     const { name, unit } = req.body;
 
     if (!name || !unit) {
@@ -481,13 +521,16 @@ app.put("/api/ingredients/:id", authenticateToken, async (req, res) => {
       });
     }
 
+    const ingredientName = String(name).trim();
+    const ingredientUnit = String(unit).trim();
+
     const existing = await get(
       `
         SELECT id
         FROM ingredients
         WHERE id = ?
         `,
-      [req.params.id],
+      [id],
     );
 
     if (!existing) {
@@ -496,8 +539,21 @@ app.put("/api/ingredients/:id", authenticateToken, async (req, res) => {
       });
     }
 
-    const ingredientName = name.trim();
-    const ingredientUnit = unit.trim();
+    const duplicate = await get(
+      `
+        SELECT id
+        FROM ingredients
+        WHERE LOWER(name) = LOWER(?)
+        AND id != ?
+        `,
+      [ingredientName, id],
+    );
+
+    if (duplicate) {
+      return res.status(409).json({
+        error: "Another ingredient with this name already exists.",
+      });
+    }
 
     await run(
       `
@@ -507,18 +563,18 @@ app.put("/api/ingredients/:id", authenticateToken, async (req, res) => {
           unit = ?
         WHERE id = ?
         `,
-      [ingredientName, ingredientUnit, req.params.id],
+      [ingredientName, ingredientUnit, id],
     );
 
-    res.json({
-      id: Number(req.params.id),
+    return res.json({
+      id,
       name: ingredientName,
       unit: ingredientUnit,
     });
   } catch (error) {
     console.error("Update ingredient error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to update ingredient.",
     });
   }
@@ -530,13 +586,21 @@ app.put("/api/ingredients/:id", authenticateToken, async (req, res) => {
 
 app.delete("/api/ingredients/:id", authenticateToken, async (req, res) => {
   try {
+    const id = getId(req.params.id);
+
+    if (!id) {
+      return res.status(400).json({
+        error: "Invalid ingredient ID.",
+      });
+    }
+
     const existing = await get(
       `
         SELECT id
         FROM ingredients
         WHERE id = ?
         `,
-      [req.params.id],
+      [id],
     );
 
     if (!existing) {
@@ -550,10 +614,10 @@ app.delete("/api/ingredients/:id", authenticateToken, async (req, res) => {
         DELETE FROM ingredients
         WHERE id = ?
         `,
-      [req.params.id],
+      [id],
     );
 
-    res.json({
+    return res.json({
       message: "Ingredient deleted successfully.",
     });
   } catch (error) {
@@ -565,7 +629,7 @@ app.delete("/api/ingredients/:id", authenticateToken, async (req, res) => {
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to delete ingredient.",
     });
   }
@@ -575,30 +639,35 @@ app.delete("/api/ingredients/:id", authenticateToken, async (req, res) => {
 // RECIPES - GET ALL
 // =====================================================
 
-app.get("/api/recipes", async (req, res) => {
+app.get("/api/recipes", authenticateToken, async (req, res) => {
   try {
     const recipes = await all(
       `
-      SELECT
-        id,
-        name,
-        description,
-        instructions,
-        difficulty,
-        category,
-        image,
-        created_at,
-        updated_at
-      FROM recipes
-      ORDER BY id DESC
-      `,
+        SELECT
+          id,
+          name,
+          description,
+          instructions,
+          difficulty,
+          category,
+          image,
+          created_at,
+          updated_at
+        FROM recipes
+        ORDER BY id DESC
+        `,
     );
 
-    res.json(recipes);
+    return res.json(
+      recipes.map((recipe) => ({
+        ...recipe,
+        id: Number(recipe.id),
+      })),
+    );
   } catch (error) {
     console.error("Load recipes error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to load recipes.",
     });
   }
@@ -608,8 +677,16 @@ app.get("/api/recipes", async (req, res) => {
 // RECIPE - GET ONE
 // =====================================================
 
-app.get("/api/recipes/:id", async (req, res) => {
+app.get("/api/recipes/:id", authenticateToken, async (req, res) => {
   try {
+    const id = getId(req.params.id);
+
+    if (!id) {
+      return res.status(400).json({
+        error: "Invalid recipe ID.",
+      });
+    }
+
     const recipe = await get(
       `
         SELECT
@@ -625,7 +702,7 @@ app.get("/api/recipes/:id", async (req, res) => {
         FROM recipes
         WHERE id = ?
         `,
-      [req.params.id],
+      [id],
     );
 
     if (!recipe) {
@@ -648,17 +725,23 @@ app.get("/api/recipes/:id", async (req, res) => {
         WHERE ri.recipe_id = ?
         ORDER BY ri.id ASC
         `,
-      [req.params.id],
+      [id],
     );
 
-    res.json({
+    return res.json({
       ...recipe,
-      ingredients,
+      id: Number(recipe.id),
+      ingredients: ingredients.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        ingredient_id: Number(item.ingredient_id),
+        quantity: Number(item.quantity),
+      })),
     });
   } catch (error) {
     console.error("Load recipe error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to load recipe.",
     });
   }
@@ -695,6 +778,11 @@ app.post("/api/recipes", authenticateToken, async (req, res) => {
       });
     }
 
+    const recipeName = String(name).trim();
+    const recipeDescription = String(description).trim();
+    const recipeInstructions = String(instructions).trim();
+    const recipeCategory = category ? String(category).trim() : "Other";
+
     const result = await run(
       `
         INSERT INTO recipes
@@ -709,24 +797,41 @@ app.post("/api/recipes", authenticateToken, async (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?)
         `,
       [
-        name.trim(),
-        description.trim(),
-        instructions.trim(),
+        recipeName,
+        recipeDescription,
+        recipeInstructions,
         difficulty,
-        category ? category.trim() : "Other",
+        recipeCategory,
         image || "",
       ],
     );
 
     const recipeId = Number(result.lastInsertRowid);
 
-    // -------------------------------------------------
-    // Recipe ingredients
-    // -------------------------------------------------
-
     if (Array.isArray(ingredients)) {
       for (const item of ingredients) {
-        if (!item.ingredient_id || !item.quantity) {
+        const ingredientId = Number(item.ingredient_id);
+        const quantity = Number(item.quantity);
+
+        if (
+          !Number.isInteger(ingredientId) ||
+          ingredientId <= 0 ||
+          !Number.isFinite(quantity) ||
+          quantity <= 0
+        ) {
+          continue;
+        }
+
+        const ingredientExists = await get(
+          `
+            SELECT id
+            FROM ingredients
+            WHERE id = ?
+            `,
+          [ingredientId],
+        );
+
+        if (!ingredientExists) {
           continue;
         }
 
@@ -743,22 +848,22 @@ app.post("/api/recipes", authenticateToken, async (req, res) => {
             `,
           [
             recipeId,
-            Number(item.ingredient_id),
-            Number(item.quantity),
-            item.unit || "",
+            ingredientId,
+            quantity,
+            item.unit ? String(item.unit).trim() : "",
           ],
         );
       }
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "Recipe created successfully.",
       id: recipeId,
     });
   } catch (error) {
     console.error("Create recipe error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to create recipe.",
     });
   }
@@ -770,6 +875,14 @@ app.post("/api/recipes", authenticateToken, async (req, res) => {
 
 app.put("/api/recipes/:id", authenticateToken, async (req, res) => {
   try {
+    const id = getId(req.params.id);
+
+    if (!id) {
+      return res.status(400).json({
+        error: "Invalid recipe ID.",
+      });
+    }
+
     const {
       name,
       description,
@@ -801,7 +914,7 @@ app.put("/api/recipes/:id", authenticateToken, async (req, res) => {
         FROM recipes
         WHERE id = ?
         `,
-      [req.params.id],
+      [id],
     );
 
     if (!existing) {
@@ -824,31 +937,48 @@ app.put("/api/recipes/:id", authenticateToken, async (req, res) => {
         WHERE id = ?
         `,
       [
-        name.trim(),
-        description.trim(),
-        instructions.trim(),
+        String(name).trim(),
+        String(description).trim(),
+        String(instructions).trim(),
         difficulty,
-        category ? category.trim() : "Other",
+        category ? String(category).trim() : "Other",
         image || "",
-        req.params.id,
+        id,
       ],
     );
-
-    // Remove old ingredients
 
     await run(
       `
         DELETE FROM recipe_ingredients
         WHERE recipe_id = ?
         `,
-      [req.params.id],
+      [id],
     );
-
-    // Add new ingredients
 
     if (Array.isArray(ingredients)) {
       for (const item of ingredients) {
-        if (!item.ingredient_id || !item.quantity) {
+        const ingredientId = Number(item.ingredient_id);
+        const quantity = Number(item.quantity);
+
+        if (
+          !Number.isInteger(ingredientId) ||
+          ingredientId <= 0 ||
+          !Number.isFinite(quantity) ||
+          quantity <= 0
+        ) {
+          continue;
+        }
+
+        const ingredientExists = await get(
+          `
+            SELECT id
+            FROM ingredients
+            WHERE id = ?
+            `,
+          [ingredientId],
+        );
+
+        if (!ingredientExists) {
           continue;
         }
 
@@ -864,22 +994,22 @@ app.put("/api/recipes/:id", authenticateToken, async (req, res) => {
             VALUES (?, ?, ?, ?)
             `,
           [
-            req.params.id,
-            Number(item.ingredient_id),
-            Number(item.quantity),
-            item.unit || "",
+            id,
+            ingredientId,
+            quantity,
+            item.unit ? String(item.unit).trim() : "",
           ],
         );
       }
     }
 
-    res.json({
+    return res.json({
       message: "Recipe updated successfully.",
     });
   } catch (error) {
     console.error("Update recipe error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to update recipe.",
     });
   }
@@ -891,13 +1021,21 @@ app.put("/api/recipes/:id", authenticateToken, async (req, res) => {
 
 app.delete("/api/recipes/:id", authenticateToken, async (req, res) => {
   try {
+    const id = getId(req.params.id);
+
+    if (!id) {
+      return res.status(400).json({
+        error: "Invalid recipe ID.",
+      });
+    }
+
     const existing = await get(
       `
         SELECT id
         FROM recipes
         WHERE id = ?
         `,
-      [req.params.id],
+      [id],
     );
 
     if (!existing) {
@@ -911,16 +1049,16 @@ app.delete("/api/recipes/:id", authenticateToken, async (req, res) => {
         DELETE FROM recipes
         WHERE id = ?
         `,
-      [req.params.id],
+      [id],
     );
 
-    res.json({
+    return res.json({
       message: "Recipe deleted successfully.",
     });
   } catch (error) {
     console.error("Delete recipe error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to delete recipe.",
     });
   }
@@ -984,23 +1122,26 @@ app.get("/api/dashboard", authenticateToken, async (req, res) => {
         `,
     );
 
-    res.json({
-      totalRecipes: Number(recipeCount.count) || 0,
+    return res.json({
+      totalRecipes: Number(recipeCount?.count) || 0,
 
-      totalIngredients: Number(ingredientCount.count) || 0,
+      totalIngredients: Number(ingredientCount?.count) || 0,
 
-      easyRecipes: Number(easyCount.count) || 0,
+      easyRecipes: Number(easyCount?.count) || 0,
 
-      mediumRecipes: Number(mediumCount.count) || 0,
+      mediumRecipes: Number(mediumCount?.count) || 0,
 
-      hardRecipes: Number(hardCount.count) || 0,
+      hardRecipes: Number(hardCount?.count) || 0,
 
-      recentRecipes,
+      recentRecipes: recentRecipes.map((recipe) => ({
+        ...recipe,
+        id: Number(recipe.id),
+      })),
     });
   } catch (error) {
     console.error("Dashboard error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to load dashboard statistics.",
     });
   }
@@ -1012,11 +1153,7 @@ app.get("/api/dashboard", authenticateToken, async (req, res) => {
 
 const frontendPath = path.join(__dirname, "../frontend");
 
-// Serve frontend files
-
 app.use(express.static(frontendPath));
-
-// Default page
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(frontendPath, "login.html"));
@@ -1027,7 +1164,7 @@ app.get("/", (req, res) => {
 // =====================================================
 
 app.use("/api", (req, res) => {
-  res.status(404).json({
+  return res.status(404).json({
     error: "API route not found.",
   });
 });
@@ -1039,29 +1176,38 @@ app.use("/api", (req, res) => {
 app.use((error, req, res, next) => {
   console.error("Server error:", error);
 
-  res.status(500).json({
+  return res.status(500).json({
     error: "Internal server error.",
   });
 });
 
 // =====================================================
-// START SERVER
+// LOCAL SERVER
 // =====================================================
+
+// This runs only when you execute:
+// node backend/server.js
+//
+// Vercel will use module.exports = app instead.
 
 if (require.main === module) {
   databaseReady
     .then(() => {
       app.listen(PORT, () => {
-        console.log(`Recipe Manager server running on port ${PORT}`);
+        console.log("=================================");
+        console.log(`Recipe Manager running on port ${PORT}`);
+        console.log(`http://localhost:${PORT}`);
+        console.log("=================================");
       });
     })
     .catch((error) => {
       console.error("Could not start server:", error);
+      process.exit(1);
     });
 }
 
 // =====================================================
-// EXPORT
+// EXPORT FOR VERCEL
 // =====================================================
 
 module.exports = app;

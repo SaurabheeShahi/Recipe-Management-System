@@ -6,6 +6,14 @@ const { createClient } = require("@libsql/client");
 // TURSO DATABASE CONNECTION
 // =====================================================
 
+if (!process.env.TURSO_DATABASE_URL) {
+  throw new Error("TURSO_DATABASE_URL is not set.");
+}
+
+if (!process.env.TURSO_AUTH_TOKEN) {
+  throw new Error("TURSO_AUTH_TOKEN is not set.");
+}
+
 const db = createClient({
   url: process.env.TURSO_DATABASE_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
@@ -17,15 +25,15 @@ const db = createClient({
 
 async function run(sql, args = []) {
   return await db.execute({
-    sql: sql,
-    args: args,
+    sql,
+    args,
   });
 }
 
 async function get(sql, args = []) {
   const result = await db.execute({
-    sql: sql,
-    args: args,
+    sql,
+    args,
   });
 
   return result.rows.length > 0 ? result.rows[0] : null;
@@ -33,8 +41,8 @@ async function get(sql, args = []) {
 
 async function all(sql, args = []) {
   const result = await db.execute({
-    sql: sql,
-    args: args,
+    sql,
+    args,
   });
 
   return result.rows;
@@ -47,6 +55,9 @@ async function all(sql, args = []) {
 async function initializeDatabase() {
   try {
     console.log("Connecting to Turso database...");
+
+    // Enable foreign-key constraints
+    await run("PRAGMA foreign_keys = ON");
 
     // =================================================
     // USERS
@@ -99,13 +110,9 @@ async function initializeDatabase() {
     await run(`
       CREATE TABLE IF NOT EXISTS recipe_ingredients (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-
         recipe_id INTEGER NOT NULL,
-
         ingredient_id INTEGER NOT NULL,
-
         quantity REAL NOT NULL,
-
         unit TEXT NOT NULL,
 
         FOREIGN KEY (recipe_id)
@@ -118,10 +125,35 @@ async function initializeDatabase() {
       )
     `);
 
+    // =================================================
+    // INDEXES
+    // =================================================
+
+    await run(`
+      CREATE INDEX IF NOT EXISTS idx_recipes_category
+      ON recipes(category)
+    `);
+
+    await run(`
+      CREATE INDEX IF NOT EXISTS idx_recipes_difficulty
+      ON recipes(difficulty)
+    `);
+
+    await run(`
+      CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe
+      ON recipe_ingredients(recipe_id)
+    `);
+
+    await run(`
+      CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_ingredient
+      ON recipe_ingredients(ingredient_id)
+    `);
+
     console.log("Turso database tables are ready.");
   } catch (error) {
-    console.error("Database initialization failed:");
-
+    console.error("=================================");
+    console.error("DATABASE INITIALIZATION FAILED");
+    console.error("=================================");
     console.error(error);
 
     throw error;
@@ -144,4 +176,5 @@ module.exports = {
   get,
   all,
   databaseReady,
+  initializeDatabase,
 };
