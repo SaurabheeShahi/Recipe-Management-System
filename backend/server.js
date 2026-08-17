@@ -4,6 +4,7 @@ const express = require("express");
 const path = require("path");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const multer = require("multer");
 
 const { run, get, all, databaseReady } = require("./db");
 
@@ -16,29 +17,50 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
 
+if (!JWT_SECRET) {
+  console.warn("WARNING: JWT_SECRET is not set.");
+}
+
 // =====================================================
-// MIDDLEWARE
+// MULTER - IMAGE UPLOAD
+// =====================================================
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+  },
+
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype || !file.mimetype.startsWith("image/")) {
+      return cb(new Error("Only image files are allowed."));
+    }
+
+    cb(null, true);
+  },
+});
+
+// =====================================================
+// BODY PARSERS
 // =====================================================
 
 app.use(
   express.json({
-    limit: "15mb",
+    limit: "5mb",
   }),
 );
 
 app.use(
   express.urlencoded({
     extended: true,
-    limit: "15mb",
+    limit: "5mb",
   }),
 );
 
 // =====================================================
-// DATABASE READY MIDDLEWARE
+// DATABASE READY
 // =====================================================
-
-// Make sure the Turso tables are ready before ANY API
-// route tries to access the database.
 
 app.use("/api", async (req, res, next) => {
   try {
@@ -54,7 +76,7 @@ app.use("/api", async (req, res, next) => {
 });
 
 // =====================================================
-// HELPER FUNCTIONS
+// HELPER - ID
 // =====================================================
 
 function getId(value) {
@@ -67,6 +89,10 @@ function getId(value) {
   return id;
 }
 
+// =====================================================
+// HELPER - TOKEN
+// =====================================================
+
 function getTokenFromRequest(req) {
   const authHeader = req.headers.authorization;
 
@@ -76,7 +102,11 @@ function getTokenFromRequest(req) {
 
   const parts = authHeader.trim().split(/\s+/);
 
-  if (parts.length !== 2 || parts[0] !== "Bearer") {
+  if (parts.length !== 2) {
+    return null;
+  }
+
+  if (parts[0].toLowerCase() !== "bearer") {
     return null;
   }
 
@@ -84,13 +114,11 @@ function getTokenFromRequest(req) {
 }
 
 // =====================================================
-// AUTHENTICATION MIDDLEWARE
+// AUTHENTICATION
 // =====================================================
 
 function authenticateToken(req, res, next) {
   if (!JWT_SECRET) {
-    console.error("JWT_SECRET is missing.");
-
     return res.status(500).json({
       error: "Server authentication configuration is missing.",
     });
@@ -120,26 +148,18 @@ function authenticateToken(req, res, next) {
 }
 
 // =====================================================
-// API HEALTH CHECK
+// API HEALTH
 // =====================================================
 
-app.get("/api", async (req, res) => {
-  try {
-    res.json({
-      message: "Recipe Management System API is running.",
-      database: "connected",
-    });
-  } catch (error) {
-    console.error("API health check error:", error);
-
-    res.status(500).json({
-      error: "Database connection failed.",
-    });
-  }
+app.get("/api", (req, res) => {
+  res.json({
+    message: "Recipe Management System API is running.",
+    database: "connected",
+  });
 });
 
 // =====================================================
-// AUTH - SIGNUP
+// SIGNUP
 // =====================================================
 
 app.post("/api/auth/signup", async (req, res) => {
@@ -153,8 +173,10 @@ app.post("/api/auth/signup", async (req, res) => {
     }
 
     const cleanName = String(name).trim();
-    const userEmail = String(email).trim().toLowerCase();
-    const userPassword = String(password);
+
+    const cleanEmail = String(email).trim().toLowerCase();
+
+    const cleanPassword = String(password);
 
     if (cleanName.length < 2) {
       return res.status(400).json({
@@ -162,13 +184,13 @@ app.post("/api/auth/signup", async (req, res) => {
       });
     }
 
-    if (!userEmail.includes("@")) {
+    if (!cleanEmail.includes("@")) {
       return res.status(400).json({
         error: "Please enter a valid email address.",
       });
     }
 
-    if (userPassword.length < 6) {
+    if (cleanPassword.length < 6) {
       return res.status(400).json({
         error: "Password must be at least 6 characters.",
       });
@@ -176,11 +198,11 @@ app.post("/api/auth/signup", async (req, res) => {
 
     const existingUser = await get(
       `
-      SELECT id
-      FROM users
-      WHERE email = ?
-      `,
-      [userEmail],
+        SELECT id
+        FROM users
+        WHERE email = ?
+        `,
+      [cleanEmail],
     );
 
     if (existingUser) {
@@ -189,39 +211,34 @@ app.post("/api/auth/signup", async (req, res) => {
       });
     }
 
-    const passwordHash = await bcrypt.hash(userPassword, 10);
+    const passwordHash = await bcrypt.hash(cleanPassword, 10);
 
     const result = await run(
       `
-      INSERT INTO users
-      (
-        name,
-        email,
-        password_hash,
-        role
-      )
-      VALUES (?, ?, ?, ?)
-      `,
-      [cleanName, userEmail, passwordHash, "admin"],
+        INSERT INTO users
+        (
+          name,
+          email,
+          password_hash,
+          role
+        )
+        VALUES (?, ?, ?, ?)
+        `,
+      [cleanName, cleanEmail, passwordHash, "admin"],
     );
 
     return res.status(201).json({
       message: "Account created successfully.",
+
       user: {
         id: Number(result.lastInsertRowid),
         name: cleanName,
-        email: userEmail,
+        email: cleanEmail,
         role: "admin",
       },
     });
   } catch (error) {
     console.error("Signup error:", error);
-
-    if (error.message && error.message.toLowerCase().includes("unique")) {
-      return res.status(409).json({
-        error: "An account with this email already exists.",
-      });
-    }
 
     return res.status(500).json({
       error: "Server error while creating account.",
@@ -230,7 +247,7 @@ app.post("/api/auth/signup", async (req, res) => {
 });
 
 // =====================================================
-// AUTH - LOGIN
+// LOGIN
 // =====================================================
 
 app.post("/api/auth/login", async (req, res) => {
@@ -243,21 +260,22 @@ app.post("/api/auth/login", async (req, res) => {
       });
     }
 
-    const userEmail = String(email).trim().toLowerCase();
-    const userPassword = String(password);
+    const cleanEmail = String(email).trim().toLowerCase();
+
+    const cleanPassword = String(password);
 
     const user = await get(
       `
-      SELECT
-        id,
-        name,
-        email,
-        password_hash,
-        role
-      FROM users
-      WHERE email = ?
-      `,
-      [userEmail],
+        SELECT
+          id,
+          name,
+          email,
+          password_hash,
+          role
+        FROM users
+        WHERE email = ?
+        `,
+      [cleanEmail],
     );
 
     if (!user) {
@@ -267,7 +285,7 @@ app.post("/api/auth/login", async (req, res) => {
     }
 
     const passwordCorrect = await bcrypt.compare(
-      userPassword,
+      cleanPassword,
       user.password_hash,
     );
 
@@ -278,8 +296,6 @@ app.post("/api/auth/login", async (req, res) => {
     }
 
     if (!JWT_SECRET) {
-      console.error("JWT_SECRET is missing.");
-
       return res.status(500).json({
         error: "Server authentication configuration is missing.",
       });
@@ -299,7 +315,9 @@ app.post("/api/auth/login", async (req, res) => {
 
     return res.json({
       message: "Login successful.",
+
       token,
+
       user: {
         id: Number(user.id),
         name: user.name,
@@ -317,7 +335,7 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 // =====================================================
-// AUTH - CURRENT USER
+// CURRENT USER
 // =====================================================
 
 app.get("/api/auth/me", authenticateToken, async (req, res) => {
@@ -373,7 +391,12 @@ app.get("/api/ingredients", authenticateToken, async (req, res) => {
         `,
     );
 
-    return res.json(ingredients);
+    return res.json(
+      ingredients.map((item) => ({
+        ...item,
+        id: Number(item.id),
+      })),
+    );
   } catch (error) {
     console.error("Load ingredients error:", error);
 
@@ -416,9 +439,8 @@ app.get("/api/ingredients/:id", authenticateToken, async (req, res) => {
     }
 
     return res.json({
+      ...ingredient,
       id: Number(ingredient.id),
-      name: ingredient.name,
-      unit: ingredient.unit,
     });
   } catch (error) {
     console.error("Load ingredient error:", error);
@@ -444,6 +466,7 @@ app.post("/api/ingredients", authenticateToken, async (req, res) => {
     }
 
     const ingredientName = String(name).trim();
+
     const ingredientUnit = String(unit).trim();
 
     if (!ingredientName || !ingredientUnit) {
@@ -454,10 +477,10 @@ app.post("/api/ingredients", authenticateToken, async (req, res) => {
 
     const existing = await get(
       `
-        SELECT id
-        FROM ingredients
-        WHERE LOWER(name) = LOWER(?)
-        `,
+          SELECT id
+          FROM ingredients
+          WHERE LOWER(name) = LOWER(?)
+          `,
       [ingredientName],
     );
 
@@ -486,12 +509,6 @@ app.post("/api/ingredients", authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error("Create ingredient error:", error);
-
-    if (error.message && error.message.toLowerCase().includes("unique")) {
-      return res.status(409).json({
-        error: "Ingredient already exists.",
-      });
-    }
 
     return res.status(500).json({
       error: "Failed to create ingredient.",
@@ -522,14 +539,15 @@ app.put("/api/ingredients/:id", authenticateToken, async (req, res) => {
     }
 
     const ingredientName = String(name).trim();
+
     const ingredientUnit = String(unit).trim();
 
     const existing = await get(
       `
-        SELECT id
-        FROM ingredients
-        WHERE id = ?
-        `,
+          SELECT id
+          FROM ingredients
+          WHERE id = ?
+          `,
       [id],
     );
 
@@ -541,11 +559,11 @@ app.put("/api/ingredients/:id", authenticateToken, async (req, res) => {
 
     const duplicate = await get(
       `
-        SELECT id
-        FROM ingredients
-        WHERE LOWER(name) = LOWER(?)
-        AND id != ?
-        `,
+          SELECT id
+          FROM ingredients
+          WHERE LOWER(name) = LOWER(?)
+          AND id != ?
+          `,
       [ingredientName, id],
     );
 
@@ -596,10 +614,10 @@ app.delete("/api/ingredients/:id", authenticateToken, async (req, res) => {
 
     const existing = await get(
       `
-        SELECT id
-        FROM ingredients
-        WHERE id = ?
-        `,
+          SELECT id
+          FROM ingredients
+          WHERE id = ?
+          `,
       [id],
     );
 
@@ -713,24 +731,26 @@ app.get("/api/recipes/:id", authenticateToken, async (req, res) => {
 
     const ingredients = await all(
       `
-        SELECT
-          ri.id,
-          ri.ingredient_id,
-          i.name,
-          ri.quantity,
-          ri.unit
-        FROM recipe_ingredients ri
-        JOIN ingredients i
-          ON i.id = ri.ingredient_id
-        WHERE ri.recipe_id = ?
-        ORDER BY ri.id ASC
-        `,
+          SELECT
+            ri.id,
+            ri.ingredient_id,
+            i.name,
+            ri.quantity,
+            ri.unit
+          FROM recipe_ingredients ri
+          JOIN ingredients i
+            ON i.id = ri.ingredient_id
+          WHERE ri.recipe_id = ?
+          ORDER BY ri.id ASC
+          `,
       [id],
     );
 
     return res.json({
       ...recipe,
+
       id: Number(recipe.id),
+
       ingredients: ingredients.map((item) => ({
         ...item,
         id: Number(item.id),
@@ -748,43 +768,206 @@ app.get("/api/recipes/:id", authenticateToken, async (req, res) => {
 });
 
 // =====================================================
+// PARSE INGREDIENTS
+// =====================================================
+
+function parseIngredients(value) {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.error("Ingredient JSON error:", error);
+
+      throw new Error("Invalid ingredient data.");
+    }
+  }
+
+  return [];
+}
+
+// =====================================================
+// ADD RECIPE INGREDIENTS
+// =====================================================
+
+async function addRecipeIngredients(recipeId, ingredients) {
+  if (!Array.isArray(ingredients) || ingredients.length === 0) {
+    throw new Error("At least one ingredient is required.");
+  }
+
+  for (const item of ingredients) {
+    const ingredientId = Number(item.ingredient_id);
+
+    const quantity = Number(item.quantity);
+
+    if (!Number.isInteger(ingredientId) || ingredientId <= 0) {
+      throw new Error("Invalid ingredient selected.");
+    }
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error("Invalid ingredient quantity.");
+    }
+
+    const ingredient = await get(
+      `
+        SELECT
+          id,
+          name,
+          unit
+        FROM ingredients
+        WHERE id = ?
+        `,
+      [ingredientId],
+    );
+
+    if (!ingredient) {
+      throw new Error(
+        `Ingredient with ID ${ingredientId} was not found in the database.`,
+      );
+    }
+
+    const unit = item.unit
+      ? String(item.unit).trim()
+      : String(ingredient.unit).trim();
+
+    if (!unit) {
+      throw new Error(`Unit is missing for ingredient "${ingredient.name}".`);
+    }
+
+    console.log("Adding recipe ingredient:", {
+      recipeId,
+      ingredientId,
+      quantity,
+      unit,
+    });
+
+    await run(
+      `
+      INSERT INTO recipe_ingredients
+      (
+        recipe_id,
+        ingredient_id,
+        quantity,
+        unit
+      )
+      VALUES (?, ?, ?, ?)
+      `,
+      [recipeId, ingredientId, quantity, unit],
+    );
+  }
+}
+
+// =====================================================
 // RECIPE - CREATE
 // =====================================================
 
-app.post("/api/recipes", authenticateToken, async (req, res) => {
-  try {
-    const {
-      name,
-      description,
-      instructions,
-      difficulty,
-      category,
-      image,
-      ingredients,
-    } = req.body;
+app.post(
+  "/api/recipes",
+  authenticateToken,
+  upload.single("image"),
+  async (req, res) => {
+    let recipeId = null;
 
-    if (!name || !description || !instructions || !difficulty) {
-      return res.status(400).json({
-        error:
-          "Recipe name, description, instructions and difficulty are required.",
-      });
-    }
+    try {
+      console.log("=================================");
 
-    const validDifficulties = ["Easy", "Medium", "Hard"];
+      console.log("CREATE RECIPE REQUEST");
 
-    if (!validDifficulties.includes(difficulty)) {
-      return res.status(400).json({
-        error: "Invalid difficulty level.",
-      });
-    }
+      console.log("Body:", req.body);
 
-    const recipeName = String(name).trim();
-    const recipeDescription = String(description).trim();
-    const recipeInstructions = String(instructions).trim();
-    const recipeCategory = category ? String(category).trim() : "Other";
+      console.log(
+        "Image:",
+        req.file
+          ? `${req.file.originalname} (${req.file.size} bytes)`
+          : "No image",
+      );
 
-    const result = await run(
-      `
+      console.log("=================================");
+
+      const {
+        name,
+        description,
+        instructions,
+        difficulty,
+        category,
+        ingredients,
+      } = req.body;
+
+      // -------------------------------------------------
+      // VALIDATION
+      // -------------------------------------------------
+
+      if (!name || !String(name).trim()) {
+        return res.status(400).json({
+          error: "Recipe name is required.",
+        });
+      }
+
+      if (!description || !String(description).trim()) {
+        return res.status(400).json({
+          error: "Recipe description is required.",
+        });
+      }
+
+      if (!instructions || !String(instructions).trim()) {
+        return res.status(400).json({
+          error: "Recipe instructions are required.",
+        });
+      }
+
+      if (!difficulty) {
+        return res.status(400).json({
+          error: "Recipe difficulty is required.",
+        });
+      }
+
+      const validDifficulties = ["Easy", "Medium", "Hard"];
+
+      if (!validDifficulties.includes(String(difficulty))) {
+        return res.status(400).json({
+          error: "Invalid difficulty level.",
+        });
+      }
+
+      // -------------------------------------------------
+      // IMAGE
+      // -------------------------------------------------
+
+      let image = "";
+
+      if (req.file) {
+        image =
+          `data:${req.file.mimetype};base64,` +
+          req.file.buffer.toString("base64");
+      }
+
+      // -------------------------------------------------
+      // INGREDIENTS
+      // -------------------------------------------------
+
+      const recipeIngredients = parseIngredients(ingredients);
+
+      if (recipeIngredients.length === 0) {
+        return res.status(400).json({
+          error: "Please add at least one ingredient.",
+        });
+      }
+
+      // -------------------------------------------------
+      // INSERT RECIPE
+      // -------------------------------------------------
+
+      const result = await run(
+        `
         INSERT INTO recipes
         (
           name,
@@ -796,135 +979,180 @@ app.post("/api/recipes", authenticateToken, async (req, res) => {
         )
         VALUES (?, ?, ?, ?, ?, ?)
         `,
-      [
-        recipeName,
-        recipeDescription,
-        recipeInstructions,
-        difficulty,
-        recipeCategory,
-        image || "",
-      ],
-    );
+        [
+          String(name).trim(),
+          String(description).trim(),
+          String(instructions).trim(),
+          String(difficulty),
+          category && String(category).trim()
+            ? String(category).trim()
+            : "Other",
+          image,
+        ],
+      );
 
-    const recipeId = Number(result.lastInsertRowid);
+      recipeId = Number(result.lastInsertRowid);
 
-    if (Array.isArray(ingredients)) {
-      for (const item of ingredients) {
-        const ingredientId = Number(item.ingredient_id);
-        const quantity = Number(item.quantity);
+      if (!recipeId) {
+        throw new Error("Recipe was created but no recipe ID was returned.");
+      }
 
-        if (
-          !Number.isInteger(ingredientId) ||
-          ingredientId <= 0 ||
-          !Number.isFinite(quantity) ||
-          quantity <= 0
-        ) {
-          continue;
-        }
+      // -------------------------------------------------
+      // INSERT INGREDIENTS
+      // -------------------------------------------------
 
-        const ingredientExists = await get(
-          `
-            SELECT id
-            FROM ingredients
+      await addRecipeIngredients(recipeId, recipeIngredients);
+
+      console.log(`Recipe ${recipeId} created successfully.`);
+
+      return res.status(201).json({
+        success: true,
+        message: "Recipe created successfully.",
+        id: recipeId,
+      });
+    } catch (error) {
+      console.error("=================================");
+
+      console.error("CREATE RECIPE ERROR");
+
+      console.error(error);
+
+      console.error("=================================");
+
+      // -------------------------------------------------
+      // CLEAN UP PARTIALLY CREATED RECIPE
+      // -------------------------------------------------
+
+      if (recipeId) {
+        try {
+          await run(
+            `
+            DELETE FROM recipes
             WHERE id = ?
             `,
-          [ingredientId],
-        );
+            [recipeId],
+          );
 
-        if (!ingredientExists) {
-          continue;
+          console.log(`Rolled back recipe ${recipeId}.`);
+        } catch (cleanupError) {
+          console.error("Cleanup error:", cleanupError);
         }
-
-        await run(
-          `
-            INSERT INTO recipe_ingredients
-            (
-              recipe_id,
-              ingredient_id,
-              quantity,
-              unit
-            )
-            VALUES (?, ?, ?, ?)
-            `,
-          [
-            recipeId,
-            ingredientId,
-            quantity,
-            item.unit ? String(item.unit).trim() : "",
-          ],
-        );
       }
+
+      return res.status(500).json({
+        success: false,
+        error: error.message || "Failed to create recipe.",
+      });
     }
-
-    return res.status(201).json({
-      message: "Recipe created successfully.",
-      id: recipeId,
-    });
-  } catch (error) {
-    console.error("Create recipe error:", error);
-
-    return res.status(500).json({
-      error: "Failed to create recipe.",
-    });
-  }
-});
+  },
+);
 
 // =====================================================
 // RECIPE - UPDATE
 // =====================================================
 
-app.put("/api/recipes/:id", authenticateToken, async (req, res) => {
-  try {
-    const id = getId(req.params.id);
+app.put(
+  "/api/recipes/:id",
+  authenticateToken,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const id = getId(req.params.id);
 
-    if (!id) {
-      return res.status(400).json({
-        error: "Invalid recipe ID.",
-      });
-    }
+      if (!id) {
+        return res.status(400).json({
+          error: "Invalid recipe ID.",
+        });
+      }
 
-    const {
-      name,
-      description,
-      instructions,
-      difficulty,
-      category,
-      image,
-      ingredients,
-    } = req.body;
+      const {
+        name,
+        description,
+        instructions,
+        difficulty,
+        category,
+        ingredients,
+      } = req.body;
 
-    if (!name || !description || !instructions || !difficulty) {
-      return res.status(400).json({
-        error:
-          "Recipe name, description, instructions and difficulty are required.",
-      });
-    }
+      if (!name || !String(name).trim()) {
+        return res.status(400).json({
+          error: "Recipe name is required.",
+        });
+      }
 
-    const validDifficulties = ["Easy", "Medium", "Hard"];
+      if (!description || !String(description).trim()) {
+        return res.status(400).json({
+          error: "Recipe description is required.",
+        });
+      }
 
-    if (!validDifficulties.includes(difficulty)) {
-      return res.status(400).json({
-        error: "Invalid difficulty level.",
-      });
-    }
+      if (!instructions || !String(instructions).trim()) {
+        return res.status(400).json({
+          error: "Recipe instructions are required.",
+        });
+      }
 
-    const existing = await get(
-      `
-        SELECT id
-        FROM recipes
-        WHERE id = ?
-        `,
-      [id],
-    );
+      if (!difficulty) {
+        return res.status(400).json({
+          error: "Recipe difficulty is required.",
+        });
+      }
 
-    if (!existing) {
-      return res.status(404).json({
-        error: "Recipe not found.",
-      });
-    }
+      const validDifficulties = ["Easy", "Medium", "Hard"];
 
-    await run(
-      `
+      if (!validDifficulties.includes(String(difficulty))) {
+        return res.status(400).json({
+          error: "Invalid difficulty level.",
+        });
+      }
+
+      const existingRecipe = await get(
+        `
+          SELECT
+            id,
+            image
+          FROM recipes
+          WHERE id = ?
+          `,
+        [id],
+      );
+
+      if (!existingRecipe) {
+        return res.status(404).json({
+          error: "Recipe not found.",
+        });
+      }
+
+      // -------------------------------------------------
+      // IMAGE
+      // -------------------------------------------------
+
+      let image = existingRecipe.image || "";
+
+      if (req.file) {
+        image =
+          `data:${req.file.mimetype};base64,` +
+          req.file.buffer.toString("base64");
+      }
+
+      // -------------------------------------------------
+      // INGREDIENTS
+      // -------------------------------------------------
+
+      const recipeIngredients = parseIngredients(ingredients);
+
+      if (recipeIngredients.length === 0) {
+        return res.status(400).json({
+          error: "Please add at least one ingredient.",
+        });
+      }
+
+      // -------------------------------------------------
+      // UPDATE RECIPE
+      // -------------------------------------------------
+
+      await run(
+        `
         UPDATE recipes
         SET
           name = ?,
@@ -936,84 +1164,51 @@ app.put("/api/recipes/:id", authenticateToken, async (req, res) => {
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         `,
-      [
-        String(name).trim(),
-        String(description).trim(),
-        String(instructions).trim(),
-        difficulty,
-        category ? String(category).trim() : "Other",
-        image || "",
-        id,
-      ],
-    );
+        [
+          String(name).trim(),
+          String(description).trim(),
+          String(instructions).trim(),
+          String(difficulty),
+          category && String(category).trim()
+            ? String(category).trim()
+            : "Other",
+          image,
+          id,
+        ],
+      );
 
-    await run(
-      `
+      // -------------------------------------------------
+      // DELETE OLD INGREDIENTS
+      // -------------------------------------------------
+
+      await run(
+        `
         DELETE FROM recipe_ingredients
         WHERE recipe_id = ?
         `,
-      [id],
-    );
+        [id],
+      );
 
-    if (Array.isArray(ingredients)) {
-      for (const item of ingredients) {
-        const ingredientId = Number(item.ingredient_id);
-        const quantity = Number(item.quantity);
+      // -------------------------------------------------
+      // ADD NEW INGREDIENTS
+      // -------------------------------------------------
 
-        if (
-          !Number.isInteger(ingredientId) ||
-          ingredientId <= 0 ||
-          !Number.isFinite(quantity) ||
-          quantity <= 0
-        ) {
-          continue;
-        }
+      await addRecipeIngredients(id, recipeIngredients);
 
-        const ingredientExists = await get(
-          `
-            SELECT id
-            FROM ingredients
-            WHERE id = ?
-            `,
-          [ingredientId],
-        );
+      return res.json({
+        success: true,
+        message: "Recipe updated successfully.",
+      });
+    } catch (error) {
+      console.error("UPDATE RECIPE ERROR:", error);
 
-        if (!ingredientExists) {
-          continue;
-        }
-
-        await run(
-          `
-            INSERT INTO recipe_ingredients
-            (
-              recipe_id,
-              ingredient_id,
-              quantity,
-              unit
-            )
-            VALUES (?, ?, ?, ?)
-            `,
-          [
-            id,
-            ingredientId,
-            quantity,
-            item.unit ? String(item.unit).trim() : "",
-          ],
-        );
-      }
+      return res.status(500).json({
+        success: false,
+        error: error.message || "Failed to update recipe.",
+      });
     }
-
-    return res.json({
-      message: "Recipe updated successfully.",
-    });
-  } catch (error) {
-    console.error("Update recipe error:", error);
-
-    return res.status(500).json({
-      error: "Failed to update recipe.",
-    });
-  }
-});
+  },
+);
 
 // =====================================================
 // RECIPE - DELETE
@@ -1031,10 +1226,10 @@ app.delete("/api/recipes/:id", authenticateToken, async (req, res) => {
 
     const existing = await get(
       `
-        SELECT id
-        FROM recipes
-        WHERE id = ?
-        `,
+          SELECT id
+          FROM recipes
+          WHERE id = ?
+          `,
       [id],
     );
 
@@ -1072,66 +1267,66 @@ app.get("/api/dashboard", authenticateToken, async (req, res) => {
   try {
     const recipeCount = await get(
       `
-        SELECT COUNT(*) AS count
-        FROM recipes
-        `,
+          SELECT COUNT(*) AS count
+          FROM recipes
+          `,
     );
 
     const ingredientCount = await get(
       `
-        SELECT COUNT(*) AS count
-        FROM ingredients
-        `,
+          SELECT COUNT(*) AS count
+          FROM ingredients
+          `,
     );
 
     const easyCount = await get(
       `
-        SELECT COUNT(*) AS count
-        FROM recipes
-        WHERE difficulty = 'Easy'
-        `,
+          SELECT COUNT(*) AS count
+          FROM recipes
+          WHERE difficulty = 'Easy'
+          `,
     );
 
     const mediumCount = await get(
       `
-        SELECT COUNT(*) AS count
-        FROM recipes
-        WHERE difficulty = 'Medium'
-        `,
+          SELECT COUNT(*) AS count
+          FROM recipes
+          WHERE difficulty = 'Medium'
+          `,
     );
 
     const hardCount = await get(
       `
-        SELECT COUNT(*) AS count
-        FROM recipes
-        WHERE difficulty = 'Hard'
-        `,
+          SELECT COUNT(*) AS count
+          FROM recipes
+          WHERE difficulty = 'Hard'
+          `,
     );
 
     const recentRecipes = await all(
       `
-        SELECT
-          id,
-          name,
-          difficulty,
-          category,
-          image
-        FROM recipes
-        ORDER BY id DESC
-        LIMIT 3
-        `,
+          SELECT
+            id,
+            name,
+            difficulty,
+            category,
+            image
+          FROM recipes
+          ORDER BY id DESC
+          LIMIT 3
+          `,
     );
 
     return res.json({
-      totalRecipes: Number(recipeCount?.count) || 0,
+      totalRecipes: Number(recipeCount.count) || 0,
 
-      totalIngredients: Number(ingredientCount?.count) || 0,
+      totalIngredients: Number(ingredientCount.count) || 0,
 
-      easyRecipes: Number(easyCount?.count) || 0,
+      easyRecipes: Number(easyCount.count) || 0,
 
-      mediumRecipes: Number(mediumCount?.count) || 0,
+      mediumRecipes: Number(mediumCount.count) || 0,
 
-      hardRecipes: Number(hardCount?.count) || 0,
+      hardRecipes: Number(hardCount.count) || 0,
 
       recentRecipes: recentRecipes.map((recipe) => ({
         ...recipe,
@@ -1170,44 +1365,61 @@ app.use("/api", (req, res) => {
 });
 
 // =====================================================
-// GENERAL ERROR HANDLER
+// ERROR HANDLER
 // =====================================================
 
 app.use((error, req, res, next) => {
   console.error("Server error:", error);
 
+  if (error instanceof multer.MulterError) {
+    if (error.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        error: "Image is too large. Maximum size is 2 MB.",
+      });
+    }
+
+    return res.status(400).json({
+      error: error.message,
+    });
+  }
+
+  if (error.message === "Only image files are allowed.") {
+    return res.status(400).json({
+      error: error.message,
+    });
+  }
+
   return res.status(500).json({
-    error: "Internal server error.",
+    error: error.message || "Internal server error.",
   });
 });
 
 // =====================================================
-// LOCAL SERVER
+// START LOCAL SERVER
 // =====================================================
-
-// This runs only when you execute:
-// node backend/server.js
-//
-// Vercel will use module.exports = app instead.
 
 if (require.main === module) {
   databaseReady
     .then(() => {
       app.listen(PORT, () => {
         console.log("=================================");
-        console.log(`Recipe Manager running on port ${PORT}`);
+
+        console.log(`Recipe Manager server running on port ${PORT}`);
+
         console.log(`http://localhost:${PORT}`);
+
         console.log("=================================");
       });
     })
     .catch((error) => {
       console.error("Could not start server:", error);
+
       process.exit(1);
     });
 }
 
 // =====================================================
-// EXPORT FOR VERCEL
+// VERCEL
 // =====================================================
 
 module.exports = app;

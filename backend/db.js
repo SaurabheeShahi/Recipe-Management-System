@@ -36,7 +36,11 @@ async function get(sql, args = []) {
     args,
   });
 
-  return result.rows.length > 0 ? result.rows[0] : null;
+  if (!result.rows || result.rows.length === 0) {
+    return null;
+  }
+
+  return result.rows[0];
 }
 
 async function all(sql, args = []) {
@@ -45,7 +49,7 @@ async function all(sql, args = []) {
     args,
   });
 
-  return result.rows;
+  return result.rows || [];
 }
 
 // =====================================================
@@ -56,12 +60,9 @@ async function initializeDatabase() {
   try {
     console.log("Connecting to Turso database...");
 
-    // Enable foreign-key constraints
-    await run("PRAGMA foreign_keys = ON");
-
-    // =================================================
+    // -------------------------------------------------
     // USERS
-    // =================================================
+    // -------------------------------------------------
 
     await run(`
       CREATE TABLE IF NOT EXISTS users (
@@ -73,9 +74,9 @@ async function initializeDatabase() {
       )
     `);
 
-    // =================================================
+    // -------------------------------------------------
     // INGREDIENTS
-    // =================================================
+    // -------------------------------------------------
 
     await run(`
       CREATE TABLE IF NOT EXISTS ingredients (
@@ -85,9 +86,9 @@ async function initializeDatabase() {
       )
     `);
 
-    // =================================================
+    // -------------------------------------------------
     // RECIPES
-    // =================================================
+    // -------------------------------------------------
 
     await run(`
       CREATE TABLE IF NOT EXISTS recipes (
@@ -103,9 +104,9 @@ async function initializeDatabase() {
       )
     `);
 
-    // =================================================
+    // -------------------------------------------------
     // RECIPE INGREDIENTS
-    // =================================================
+    // -------------------------------------------------
 
     await run(`
       CREATE TABLE IF NOT EXISTS recipe_ingredients (
@@ -125,9 +126,9 @@ async function initializeDatabase() {
       )
     `);
 
-    // =================================================
+    // -------------------------------------------------
     // INDEXES
-    // =================================================
+    // -------------------------------------------------
 
     await run(`
       CREATE INDEX IF NOT EXISTS idx_recipes_category

@@ -1,245 +1,121 @@
 <!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
 
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <title>Add / Edit Recipe</title>
 
-    <link
-        rel="stylesheet"
-        href="css/recipe-add-edit.css"
-    >
+    <link rel="stylesheet" href="css/recipe-add-edit.css" />
+  </head>
 
-</head>
+  <body>
+    <header>
+      <div class="logo">Recipe Manager</div>
 
+      <nav>
+        <a href="dashboard.html"> Dashboard </a>
 
-<body>
+        <a href="recipe-list.html"> Recipes </a>
 
+        <a href="ingredient-list.html"> Ingredients </a>
 
-<header>
+        <a href="recipe-add-edit.html" class="active"> Add Recipe </a>
+      </nav>
+    </header>
 
-    <div class="logo">
-        Recipe Manager
-    </div>
+    <main class="container">
+      <h1 id="pageTitle">Add Recipe</h1>
 
+      <p class="subtitle">Enter the details of your recipe below.</p>
 
-    <nav>
-
-        <a href="dashboard.html">
-            Dashboard
-        </a>
-
-        <a href="recipe-list.html">
-            Recipes
-        </a>
-
-        <a href="ingredient-list.html">
-            Ingredients
-        </a>
-
-        <a
-            href="recipe-add-edit.html"
-            class="active"
-        >
-            Add Recipe
-        </a>
-
-    </nav>
-
-</header>
-
-
-<main class="container">
-
-
-    <h1 id="pageTitle">
-        Add Recipe
-    </h1>
-
-
-    <p class="subtitle">
-        Enter the details of your recipe below.
-    </p>
-
-
-    <form
-        id="recipeForm"
-        enctype="multipart/form-data"
-    >
-
-
+      <form id="recipeForm" enctype="multipart/form-data">
         <!-- Recipe Name -->
 
-        <label for="recipeName">
-            Recipe Name
-        </label>
-
+        <label for="recipeName"> Recipe Name </label>
 
         <input
-            type="text"
-            id="recipeName"
-            placeholder="Enter recipe name"
-            required
-        >
-
+          type="text"
+          id="recipeName"
+          placeholder="Enter recipe name"
+          required
+        />
 
         <!-- Description -->
 
-        <label for="description">
-            Description
-        </label>
-
+        <label for="description"> Description </label>
 
         <textarea
-            id="description"
-            rows="4"
-            placeholder="Enter recipe description"
-            required
+          id="description"
+          rows="4"
+          placeholder="Enter recipe description"
+          required
         ></textarea>
-
 
         <!-- Difficulty -->
 
-        <label for="difficulty">
-            Difficulty Level
-        </label>
+        <label for="difficulty"> Difficulty Level </label>
 
+        <select id="difficulty" required>
+          <option value="">Select difficulty</option>
 
-        <select
-            id="difficulty"
-            required
-        >
+          <option value="Easy">Easy</option>
 
-            <option value="">
-                Select difficulty
-            </option>
+          <option value="Medium">Medium</option>
 
-            <option value="Easy">
-                Easy
-            </option>
-
-            <option value="Medium">
-                Medium
-            </option>
-
-            <option value="Hard">
-                Hard
-            </option>
-
+          <option value="Hard">Hard</option>
         </select>
-
 
         <!-- Instructions -->
 
-        <label for="instructions">
-            Instructions
-        </label>
-
+        <label for="instructions"> Instructions </label>
 
         <textarea
-            id="instructions"
-            rows="7"
-            placeholder="Enter cooking instructions. Put each step on a new line."
-            required
+          id="instructions"
+          rows="7"
+          placeholder="Enter cooking instructions. Put each step on a new line."
+          required
         ></textarea>
-
 
         <!-- Ingredients -->
 
-        <h2>
-            Ingredients
-        </h2>
+        <h2>Ingredients</h2>
 
-
-        <div
-            id="ingredientContainer"
-        >
-
-            <!-- Ingredient rows added by JS -->
-
+        <div id="ingredientContainer">
+          <!-- Ingredient rows added by JS -->
         </div>
 
-
-        <button
-            type="button"
-            id="addIngredient"
-            class="secondary-btn"
-        >
-            + Add Ingredient
+        <button type="button" id="addIngredient" class="secondary-btn">
+          + Add Ingredient
         </button>
-
 
         <!-- Image -->
 
-        <h2>
-            Recipe Image
-        </h2>
+        <h2>Recipe Image</h2>
 
+        <label for="recipeImage" class="upload-label"> Upload Image </label>
 
-        <label
-            for="recipeImage"
-            class="upload-label"
-        >
-            Upload Image
-        </label>
-
-
-        <input
-            type="file"
-            id="recipeImage"
-            accept="image/*"
-        >
-
+        <input type="file" id="recipeImage" accept="image/*" />
 
         <div id="imagePreview"></div>
 
-
         <!-- Message -->
 
-        <div
-            id="formMessage"
-            aria-live="polite"
-        ></div>
-
+        <div id="formMessage" aria-live="polite"></div>
 
         <!-- Buttons -->
 
         <div class="form-buttons">
+          <button type="submit" class="save-btn" id="saveButton">
+            Save Recipe
+          </button>
 
-            <button
-                type="submit"
-                class="save-btn"
-                id="saveButton"
-            >
-                Save Recipe
-            </button>
-
-
-            <a
-                href="recipe-list.html"
-                class="cancel-btn"
-            >
-                Cancel
-            </a>
-
+          <a href="recipe-list.html" class="cancel-btn"> Cancel </a>
         </div>
+      </form>
+    </main>
 
-
-    </form>
-
-
-</main>
-
-
-<script src="js/recipe-add-edit.js"></script>
-
-</body>
-
+    <script src="js/recipe-add-edit.js"></script>
+  </body>
 </html>
